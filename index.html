@@ -6,7 +6,6 @@
     <title>Chat Widget - Mr. Spark</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Estilos CSS aquí */
         :root {
             --primary-yellow: #FFD700;
             --dark-yellow: #fda500;
@@ -715,6 +714,13 @@
         const optionsContainer = chatContainer.querySelector('.options-container');
         const welcomeText = chatContainer.querySelector('.welcome-text');
         const subWelcomeText = chatContainer.querySelector('.sub-welcome-text');
+        function addMessage(sender, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}`;
+            messageDiv.textContent = message;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
         function generateUUID() {
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
                 const r = Math.random() * 16 | 0;
@@ -726,7 +732,7 @@
             const newOptions = [
                 { text: "Innovation Consulting", i: 4 },
                 { text: "Innovation Strategy Design", i: 5 },
-                { text: "Inspiring\nKeynote ", i: 6 },
+                { text: "Inspiring\nKeynote", i: 6 },
                 { text: "Individual\nTraining", i: 7 }
             ];
             optionsContainer.innerHTML = '';
@@ -804,10 +810,7 @@
                     userId: ""
                 }
             };
-            const userMessageDiv = document.createElement('div');
-            userMessageDiv.className = 'chat-message user';
-            userMessageDiv.textContent = message;
-            messagesContainer.appendChild(userMessageDiv);
+            addMessage('user', message);
             const tempBotMessageDiv = document.createElement('div');
             tempBotMessageDiv.className = 'chat-message bot';
             tempBotMessageDiv.innerHTML = '<span class="loading-dots"><span></span><span></span><span></span></span>';
@@ -821,20 +824,26 @@
                     },
                     body: JSON.stringify(messageData)
                 });
-                const data = await response.json();
+                const data = await response.text();
+                console.log("Raw response data:", data);
+                let parsedData;
+                try {
+                    parsedData = JSON.parse(data);
+                } catch (e) {
+                    console.error("Error parsing JSON:", e);
+                    addMessage('bot', "Lo siento, hubo un problema al procesar tu solicitud.");
+                    messagesContainer.removeChild(tempBotMessageDiv);
+                    return;
+                }
                 messagesContainer.removeChild(tempBotMessageDiv);
-                const botMessageDiv = document.createElement('div');
-                botMessageDiv.className = 'chat-message bot';
                 let responseText = '';
-                if (Array.isArray(data) && data.length > 0) {
-                    const parsedOutput = JSON.parse(data[0].output);
+                if (Array.isArray(parsedData) && parsedData.length > 0) {
+                    const parsedOutput = JSON.parse(parsedData[0].output);
                     responseText = parsedOutput.SayText || JSON.stringify(parsedOutput);
                 } else {
-                    responseText = JSON.stringify(data);
+                    responseText = JSON.stringify(parsedData);
                 }
-                botMessageDiv.textContent = responseText;
-                messagesContainer.appendChild(botMessageDiv);
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                addMessage('bot', responseText);
                 if (responseText.includes("What service are you interested in?")) {
                     showOptions([
                         { text: "Product Design", i: 0 },
@@ -859,6 +868,8 @@
                 }
             } catch (error) {
                 console.error('Error:', error);
+                addMessage('bot', "Lo siento, hubo un problema al procesar tu solicitud.");
+                messagesContainer.removeChild(tempBotMessageDiv);
             }
         }
         function showOptions(options) {
@@ -935,7 +946,13 @@
         freeTextSendButton.addEventListener('click', () => {
             const message = freeTextArea.value.trim();
             if (message) {
-                sendMessage(message);
+                if (!currentSessionId) {
+                    startNewConversation().then(() => {
+                        sendMessage(message);
+                    });
+                } else {
+                    sendMessage(message);
+                }
                 freeTextArea.value = '';
             }
         });
@@ -944,7 +961,13 @@
                 e.preventDefault();
                 const message = freeTextArea.value.trim();
                 if (message) {
-                    sendMessage(message);
+                    if (!currentSessionId) {
+                        startNewConversation().then(() => {
+                            sendMessage(message);
+                        });
+                    } else {
+                        sendMessage(message);
+                    }
                     freeTextArea.value = '';
                 }
             }
